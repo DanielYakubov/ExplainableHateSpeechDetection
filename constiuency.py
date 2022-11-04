@@ -64,9 +64,10 @@ def write_span_file(input_file: str, output_file: str) -> None:
                     spans = _get_largest_constituents(tree)
                     for span in spans:
                         if _check_span(span, stops):
-                            lc_span = [w.lower() for w in span]
+                            lc_span = ' '.join([w.lower() for w in span])
                             csv_writer.writerow([id, lc_span, 1, hs_label, target_label])
                         else:
+                            span = ' '.join(span)
                             csv_writer.writerow([id, span, 0, hs_label, target_label])
         logging.info(f"{output_file} written successfully")
 
