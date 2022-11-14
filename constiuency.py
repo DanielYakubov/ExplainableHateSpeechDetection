@@ -4,6 +4,7 @@ import nltk
 import ast
 import logging
 
+from statistics import mean
 from typing import Iterable, List
 
 logging.basicConfig(level=logging.INFO)
@@ -34,7 +35,7 @@ def _check_span(span: List[str], stops: Iterable[str]) -> bool:
     :param stops: a stopword list
     :return: True if the span is uniform upper case, False if it consists of only stops or has non-uppercased strs
     """
-    lst = [word.isupper() for word in span if word not in stops]
+    lst = [word.isupper() for word in span if word.lower() not in stops]
     return all(lst) if lst else False
 
 
@@ -62,17 +63,20 @@ def write_span_file(input_file: str, output_file: str) -> None:
                     hs = [w.upper() if i > 0 else w for w, i in zip(post_toks, rationales)]
                     tree = parser.parse(hs)
                     spans = _get_largest_constituents(tree)
+                    start_idx = 0
                     for span in spans:
+                        lc_span = ' '.join([w.lower() for w in span])
+                        end_idx = start_idx + len(span)
                         if _check_span(span, stops):
-                            lc_span = ' '.join([w.lower() for w in span])
-                            csv_writer.writerow([id, lc_span, 1, hs_label, target_label])
+                            attn_vec = rationales[start_idx: end_idx] # the attention vector that corresponds to the span
+                            csv_writer.writerow([id, lc_span, mean(attn_vec), hs_label, target_label])
                         else:
-                            span = ' '.join(span)
-                            csv_writer.writerow([id, span, 0, hs_label, target_label])
+                            csv_writer.writerow([id, lc_span, 0, hs_label, target_label])
+                        start_idx = end_idx
         logging.info(f"{output_file} written successfully")
 
 
 if __name__ == "__main__":
-    input_file = 'original_data.csv'
-    output_file = 'span_annotation.csv'
+    input_file = 'data/datasets/original_data.tsv'
+    output_file = 'data/datasets/span_annotation.tsv'
     write_span_file(input_file, output_file)
