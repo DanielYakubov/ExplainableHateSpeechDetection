@@ -4,7 +4,6 @@ import nltk
 import ast
 import logging
 
-from statistics import mean
 from typing import Iterable, List
 
 logging.basicConfig(level=logging.INFO)
@@ -69,7 +68,8 @@ def write_span_file(input_file: str, output_file: str) -> None:
                         end_idx = start_idx + len(span)
                         if _check_span(span, stops):
                             attn_vec = rationales[start_idx: end_idx] # the attention vector that corresponds to the span
-                            csv_writer.writerow([id, lc_span, mean(attn_vec), hs_label, target_label])
+                            span_no_stops = [w for w in span if w not in stops] # stops aren't really used as rationales, they were included for constituency parsing
+                            csv_writer.writerow([id, lc_span, sum(attn_vec)/len(span_no_stops), hs_label, target_label])
                         else:
                             csv_writer.writerow([id, lc_span, 0, hs_label, target_label])
                         start_idx = end_idx
