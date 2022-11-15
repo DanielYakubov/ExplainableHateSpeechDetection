@@ -37,6 +37,12 @@ def compute_metrics(eval_pred):
     return metric.compute(predicitions=predictions, references=labels)
 
 
+def tokenize_dataset(dataset):
+    def _tokenize_function(datapoint):
+        return TOKENIZER.tokenize(datapoint["text"], padding="max_length", truncation=True)
+    return dataset.map(_tokenize_function, batched=True)
+
+
 def fine_tune_classifier(model_path_or_name: str, train_dataset, eval_dataset):
     classifier = BertForSequenceClassification.from_pretrained(model_path_or_name, 
                                                                 num_labels=3,
@@ -55,5 +61,6 @@ def fine_tune_classifier(model_path_or_name: str, train_dataset, eval_dataset):
 
 if __name__ == "__main__":
     sentence = "this is a sentence to test"
+
     get_embeddings(sentence)
     # fine_tune_classifer('bert-base-uncase', 'data/datasets/span_annotation_train.tsv', 'data/datasets/span_annotation_val.tsv')
