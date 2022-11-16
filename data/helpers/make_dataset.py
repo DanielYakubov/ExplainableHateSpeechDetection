@@ -16,7 +16,7 @@ class HateSpanClsDataset(Dataset):
             :param csv_file_path: the path of the data needed to be transformed into a dataset
         """
         self.data = pd.read_csv(tsv_file_path, delimiter='\t')
-        self.spans = self.data["span"].to_list()
+        self.texts = self.data["span"].to_list()
         self.a_s = self.data["span_label"].to_list()
         self.labels = self.data["post_hs_label"].to_list()
 
@@ -25,16 +25,16 @@ class HateSpanClsDataset(Dataset):
     
     def __getitem__(self, idx):
         assert idx < len(self), "index must be in range"
-        span = self.spans[idx]
+        text = self.texts[idx]
         label = self.labels[idx]
         a_s = self.a_s[idx] 
-        return {"span": span, "a_s": a_s, "label": label}
+        return {"text": text, "a_s": a_s, "label": label}
 
     def update(self, idx, point, new_val):
-        assert point in ["span", "label", "a_s"], "not a valid attribute"
+        assert point in ["text", "label", "a_s"], "not a valid attribute"
         assert idx < len(self), "index must be in range"
-        if point == "span":
-            self.spans[idx] = new_val
+        if point == "text":
+            self.texts[idx] = new_val
         elif point == "label":
             self.labels[idx] = new_val
         elif point == "a_s":
