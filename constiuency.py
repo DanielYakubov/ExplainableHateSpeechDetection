@@ -38,6 +38,21 @@ def _check_span(span: List[str], stops: Iterable[str]) -> bool:
     return all(lst) if lst else False
 
 
+def _get_span_intensity(num: float):
+    if num == 0:
+        return 0
+    elif 0 < num <= 0.2:
+        return 1
+    elif 0.2 < num <= 0.4:
+        return 2
+    elif 0.4 < num <= 0.6:
+        return 3
+    elif 0.6 < num <= 0.8:
+        return 4
+    else:
+        return 5
+
+
 def write_span_file(input_file: str, output_file: str) -> None:
     """
     writes a file with spans and span labels
@@ -69,7 +84,8 @@ def write_span_file(input_file: str, output_file: str) -> None:
                         if _check_span(span, stops):
                             attn_vec = rationales[start_idx: end_idx] # the attention vector that corresponds to the span
                             span_no_stops = [w for w in span if w not in stops] # stops aren't really used as rationales, they were included for constituency parsing
-                            csv_writer.writerow([id, lc_span, sum(attn_vec)/len(span_no_stops), hs_label, target_label])
+                            intensity_label = _get_span_intensity(sum(attn_vec)/len(span_no_stops))
+                            csv_writer.writerow([id, lc_span, intensity_label, hs_label, target_label])
                         else:
                             csv_writer.writerow([id, lc_span, 0, hs_label, target_label])
                         start_idx = end_idx

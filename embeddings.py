@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import pandas as pd
 import logging
 from tqdm.auto import tqdm
 
@@ -10,21 +11,14 @@ from torch.utils.data import DataLoader
 import evaluate
 import sklearn
 from transformers import AutoTokenizer, BertModel, AutoModelForSequenceClassification, TrainingArguments, Trainer, get_scheduler
-from data.helpers.make_dataset import create_cls_dataset
+from data.helpers.make_dataset import HateSpanClsDataset
 
 logging.basicConfig(level=logging.INFO)
 
-TOKENIZER = AutoTokenizer.from_pretrained('bert-base-uncased')
+TOKENIZER = AutoTokenizer.from_pretrained('distilbert-base-uncased')
 MODEL = BertModel.from_pretrained('bert-base-uncased',
                                  output_hidden_states=True)
-                    
-# MODEL.eval()
 
-LABEL_TO_NUMBER = {
-    "normal": [0, 0],
-    "offensive": [1, 0],
-    "hatespeech": [0, 1]
-}
 
 def get_embeddings(span):
     span  = "[CLS]" + span + "[SEP]"
@@ -48,90 +42,136 @@ def compute_metrics(eval_pred):
     predictions = np.argmax(logits, axis=-1)
     return metric.compute(predicitions=predictions, references=labels)
 
-def preprocess_dataset(dataset):
 
-    def _tokenize_function(datapoint):
-        return TOKENIZER(datapoint["text"], padding="max_length", truncation=True)
+def preprocess_dataset_for_classification(dataset_filepath):
+    l2n = {
+    "normal": 0,
+    "offensive": 1,
+    "hatespeech": 2
+    }
 
-    for idx in range(len(dataset)):
-        tokenized_span = _tokenize_function(dataset[idx])
-        dataset.update(idx, "label", LABEL_TO_NUMBER[dataset[idx]["label"]])
-        if dataset[idx]["a_s"] == 0 and dataset[idx]["label"] != [0, 0]:
-            dataset.update(idx, "label", [0,0]) # a span is normal if it has no a_s, i.e. it is not a rationale for offensive or hate speech
-        dataset.update(idx, "text", tokenized_span)
-    for idx in range(len(dataset)):
-        print(dataset[idx])
-    return dataset
+    data = pd.read_csv(dataset_filepath, delimiter='\t')
+    texts = data["span"].to_list()
+    labels = data["post_hs_label"]
+    a_s = data["span_label"]
+
+    out_labels = []
+    for l, a in zip(labels, a_s):
+        l = l2n[l]
+        # if a = 0 the span is "normal" i.e. not a rationale for hate/offensive label, even if the whole text is hate/offensive
+        if a == 0:
+            l = 0
+        out_labels.append(l)
+    encodings = TOKENIZER(texts, truncation=True, padding=True, max_length=30) # don't expect any spans to be very long
+    return encodings, out_labels
 
 
-def fine_tune_classifier(model_path_or_name: str, train_dataset, eval_dataset):
-    classifier = AutoModelForSequenceClassification.from_pretrained(model_path_or_name, 
-                                                                num_labels=5)
-    training_args = TrainingArguments(output_dir="test_trainer", evaluation_strategy="epoch")
-    trainer = Trainer(
-        model=classifier,
-        args=training_args,
-        train_dataset=train_dataset,
-        eval_dataset=eval_dataset,
-        compute_metrics=compute_metrics
-    )
-    trainer.train()
-    return classifier
+def preprocess_dataset_for_att_classification(dataset_filepath):
+    data = pd.read_csv(dataset_filepath, delimiter='\t')
+    texts = data["span"].to_list()
+    labels = data["span_label"]
+    encodings = TOKENIZER(texts, truncation=True, padding=True, max_length=30) # don't expect any spans to be very long
+    return encodings, labels
 
 
 if __name__ == "__main__":
     # sentence = "this is a sentence to test"
     # v = get_embeddings(sentence)
-    # train_dataset = create_cls_dataset('data/datasets/span_annotation_train.tsv')
-    # val_dataset = create_cls_dataset('data/datasets/span_annotation_val.tsv')
-    # tokenized_train = preprocess_dataset(train_dataset)
-    # tokenized_val = preprocess_dataset(val_dataset)
-    # classifier = fine_tune_classifier('bert-base-cased', tokenized_train, tokenized_val)
-    dataset = load_dataset("yelp_review_full")
+
+    # Classification of span label
+    # train_encodings, train_labels = preprocess_dataset_for_classification('data/datasets/span_annotation_train.tsv')
+    # val_encodings, val_labels = preprocess_dataset_for_classification('data/datasets/span_annotation_val.tsv')
+    # train_dataset = HateSpanClsDataset(train_encodings, train_labels)
+    # val_dataset = HateSpanClsDataset(val_encodings, val_labels)
+
+    # train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=12)
+    # test_dataloader = DataLoader(val_dataset, batch_size=12)
+
+    # classifier = AutoModelForSequenceClassification.from_pretrained('distilbert-base-uncased', 
+    #                                                             num_labels=3)
+
+    # optimizer = AdamW(classifier.parameters(), lr=5e-5)
+
+    # num_epochs = 3
+    # num_training_steps = num_epochs * len(train_dataloader)
+    # lr_scheduler = get_scheduler(
+    #     name="linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=num_training_steps
+    # )
+    # device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    # classifier.to(device)
+
+    # # training loop
+    # progress_bar = tqdm(range(num_training_steps))
+    # classifier.train()
+    # for epoch in range(num_epochs):
+    #     for batch in train_dataloader:
+    #         batch = {k: v.to(device) for k, v in batch.items()}
+    #         outputs = classifier(**batch)
+    #         loss = outputs.loss
+    #         loss.backward()
+
+    #         optimizer.step()
+    #         lr_scheduler.step()
+    #         optimizer.zero_grad()
+    #         progress_bar.update(1)
+    #     # saving the model per epoch
+    #     # torch.save(classifier, 'models/span_classifier_model.pth')
     
-    def tokenize_func(examples):
-        return TOKENIZER(examples["text"], padding="max_length", truncation=True)
+    # # evaluate
+    # metric = evaluate.load("f1")
+    # classifier.eval()
+    # for batch in test_dataloader:
+    #     batch = {k: v.to(device) for k, v in batch.items()}
+    #     with torch.no_grad():
+    #         outputs = classifier(**batch)
+    #     logits = outputs.logits
+    #     predictions = torch.argmax(logits, dim=-1)
+    #     metric.add_batch(predictions=predictions, references=batch["labels"])
+    # res = metric.compute(average='micro')
+    # print(res)
 
-    tokenized_datasets = dataset.map(tokenize_func, batched=True)
-    tokenized_datasets = tokenized_datasets.remove_columns(["text"])
-    tokenized_datasets = tokenized_datasets.rename_column("label", "labels")
-    tokenized_datasets.set_format("torch")
-    
-    small_train_dataset = tokenized_datasets["train"].shuffle(seed=42).select(range(50))
-    small_eval_dataset = tokenized_datasets["test"].shuffle(seed=42).select(range(50))
 
-    train_dataloader = DataLoader(small_train_dataset, shuffle=True, batch_size=6)
-    test_dataloader = DataLoader(small_eval_dataset, batch_size=6)
 
-    classifier = AutoModelForSequenceClassification.from_pretrained('bert-base-uncased', 
-                                                                num_labels=5)
+    # Classification of span label strength
+    # train_encodings, train_labels = preprocess_dataset_for_att_classification('data/datasets/span_annotation_train.tsv')
+    val_encodings, val_labels = preprocess_dataset_for_att_classification('data/datasets/span_annotation_val.tsv')
+    # train_dataset = HateSpanClsDataset(train_encodings, train_labels)
+    val_dataset = HateSpanClsDataset(val_encodings, val_labels)
 
-    optimizer = AdamW(classifier.parameters(), lr=5e-5)
+    # train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=5)
+    test_dataloader = DataLoader(val_dataset, batch_size=5)
 
-    num_epochs = 3
-    num_training_steps = num_epochs * len(train_dataloader)
-    lr_scheduler = get_scheduler(
-        name="linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=num_training_steps
-    )
+    # classifier = AutoModelForSequenceClassification.from_pretrained('distilbert-base-uncased', 
+    #                                                             num_labels=6)
+
+    # optimizer = AdamW(classifier.parameters(), lr=5e-5)
+
+    # num_epochs = 3
+    # num_training_steps = num_epochs * len(train_dataloader)
+    # lr_scheduler = get_scheduler(
+    #     name="linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=num_training_steps
+    # )
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    classifier.to(device)
+    # classifier.to(device)
 
-    # training loop
-    progress_bar = tqdm(range(num_training_steps))
-    classifier.train()
-    for epoch in range(num_epochs):
-        for batch in train_dataloader:
-            batch = {k: v.to(device) for k, v in batch.items()}
-            outputs = classifier(**batch)
-            loss = outputs.loss
-            loss.backward()
+    # # training loop
+    # progress_bar = tqdm(range(num_training_steps))
+    # classifier.train()
+    # for epoch in range(num_epochs):
+    #     for batch in train_dataloader:
+    #         batch = {k: v.to(device) for k, v in batch.items()}
+    #         outputs = classifier(**batch)
+    #         loss = outputs.loss
+    #         loss.backward()
 
-            optimizer.step()
-            lr_scheduler.step()
-            optimizer.zero_grad()
-            progress_bar.update(1)
-        # saving the model per epoch
-        torch.save(classifier, 'models/span_classifier_model.pth')
+    #         optimizer.step()
+    #         lr_scheduler.step()
+    #         optimizer.zero_grad()
+    #         progress_bar.update(1)
+    #     # saving the model per epoch
+    #     torch.save(classifier, 'models/span_intensity_cls_model.pth')
+    classifier = torch.load('models/span_intensity_cls_model.pth')
+    classifier.eval()
     
     # evaluate
     metric = evaluate.load("f1")
@@ -145,5 +185,3 @@ if __name__ == "__main__":
         metric.add_batch(predictions=predictions, references=batch["labels"])
     res = metric.compute(average='micro')
     print(res)
-
-            
