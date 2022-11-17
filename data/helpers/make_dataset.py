@@ -1,17 +1,11 @@
-import pandas as pd
-import numpy as np
 import torch
-
 from torch.utils.data import Dataset
 
-class HateSpanClsDataset(Dataset):
+
+class HateSpanDataset(Dataset):
     """creating the dataset needed to run huggingface trainer on data"""
 
     def __init__(self, encodings, labels):
-        """
-        Args
-            :param csv_file_path: the path of the data needed to be transformed into a dataset
-        """
         self.encodings = encodings
         self.labels = labels
 

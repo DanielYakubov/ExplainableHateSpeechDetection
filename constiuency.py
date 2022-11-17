@@ -1,10 +1,10 @@
-import benepar
-import csv
-import nltk
 import ast
+import csv
 import logging
-
 from typing import Iterable, List
+
+import benepar
+import nltk
 
 logging.basicConfig(level=logging.INFO)
 
@@ -38,7 +38,12 @@ def _check_span(span: List[str], stops: Iterable[str]) -> bool:
     return all(lst) if lst else False
 
 
-def _get_span_intensity(num: float):
+def get_span_intensity(num: float) -> int:
+    """
+    condenses float labels in the dataset into 6 int labels
+    :param num: a float representing rationale agreeableness
+    :return: an int from 0-5
+    """
     if num == 0:
         return 0
     elif 0 < num <= 0.2:
@@ -84,7 +89,7 @@ def write_span_file(input_file: str, output_file: str) -> None:
                         if _check_span(span, stops):
                             attn_vec = rationales[start_idx: end_idx] # the attention vector that corresponds to the span
                             span_no_stops = [w for w in span if w not in stops] # stops aren't really used as rationales, they were included for constituency parsing
-                            intensity_label = _get_span_intensity(sum(attn_vec)/len(span_no_stops))
+                            intensity_label = get_span_intensity(sum(attn_vec)/len(span_no_stops))
                             csv_writer.writerow([id, lc_span, intensity_label, hs_label, target_label])
                         else:
                             csv_writer.writerow([id, lc_span, 0, hs_label, target_label])

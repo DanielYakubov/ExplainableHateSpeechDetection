@@ -1,17 +1,19 @@
-import torch
+import logging
+from typing import List, Tuple
+
+import evaluate
 import numpy as np
 import pandas as pd
-import logging
-from tqdm.auto import tqdm
-
+import sklearn
+import torch
 from datasets import load_dataset
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
+from tqdm.auto import tqdm
+from transformers import (AutoModelForSequenceClassification, AutoTokenizer,
+                          BertModel, Trainer, TrainingArguments, get_scheduler)
 
-import evaluate
-import sklearn
-from transformers import AutoTokenizer, BertModel, AutoModelForSequenceClassification, TrainingArguments, Trainer, get_scheduler
-from data.helpers.make_dataset import HateSpanClsDataset
+from data.helpers.make_dataset import HateSpanDataset
 
 logging.basicConfig(level=logging.INFO)
 
@@ -20,8 +22,14 @@ MODEL = BertModel.from_pretrained('bert-base-uncased',
                                  output_hidden_states=True)
 
 
-def get_embeddings(span):
-    span  = "[CLS]" + span + "[SEP]"
+def get_embeddings(span: str) -> object:
+    """
+    Calculates the embedding for a span. The embedding is calculated by taking the average of
+    the second to last layer of a BERT model for each token in the span
+    :param span: str span
+    :return: an embedding for the span
+    """
+    span = "[CLS]" + span + "[SEP]"
     tokenized_span = list(TOKENIZER(span))
     indexed_tokens = TOKENIZER.convert_tokens_to_ids(tokenized_span)
     segment_ids = [1] * len(indexed_tokens)
@@ -36,18 +44,18 @@ def get_embeddings(span):
     return sentence_embedding
 
 
-def compute_metrics(eval_pred):
-    metric = evaluate.load("f1") # unbalanced dataset
-    logits, labels = eval_pred
-    predictions = np.argmax(logits, axis=-1)
-    return metric.compute(predicitions=predictions, references=labels)
-
-
-def preprocess_dataset_for_classification(dataset_filepath):
+def preprocess_dataset_for_classification(dataset_filepath: str) -> Tuple[List[object], List[int]]:
+    """
+    preprocesses the span dataset. Spans that have a_s > 0 and have a post level label in
+    ["hatespeech", "offensive"] are kept as is, everything else is converted to normal labels.
+    :param dataset_filepath: a file path to a dataset containing spans, the columns must include
+    ["span", "post_hs_label", "span_label"]
+    :return: a tuple containing a list of embeddings and a list of labels for the output
+    """
     l2n = {
-    "normal": 0,
-    "offensive": 1,
-    "hatespeech": 2
+        "normal": 0,
+        "offensive": 1,
+        "hatespeech": 2
     }
 
     data = pd.read_csv(dataset_filepath, delimiter='\t')
@@ -67,6 +75,12 @@ def preprocess_dataset_for_classification(dataset_filepath):
 
 
 def preprocess_dataset_for_att_classification(dataset_filepath):
+    """
+    preprocesses the span dataset for agreeableness classification
+    :param dataset_filepath: a file path to a dataset containing spans, the columns must include
+    ["span", "span_label"]
+    :return: a tuple containing a list of embeddings and a list of labels for the output
+    """
     data = pd.read_csv(dataset_filepath, delimiter='\t')
     texts = data["span"].to_list()
     labels = data["span_label"]
@@ -75,14 +89,11 @@ def preprocess_dataset_for_att_classification(dataset_filepath):
 
 
 if __name__ == "__main__":
-    # sentence = "this is a sentence to test"
-    # v = get_embeddings(sentence)
-
     # Classification of span label
     # train_encodings, train_labels = preprocess_dataset_for_classification('data/datasets/span_annotation_train.tsv')
     # val_encodings, val_labels = preprocess_dataset_for_classification('data/datasets/span_annotation_val.tsv')
-    # train_dataset = HateSpanClsDataset(train_encodings, train_labels)
-    # val_dataset = HateSpanClsDataset(val_encodings, val_labels)
+    # train_dataset = HateSpanDataset(train_encodings, train_labels)
+    # val_dataset = HateSpanDataset(val_encodings, val_labels)
 
     # train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=12)
     # test_dataloader = DataLoader(val_dataset, batch_size=12)
@@ -135,8 +146,8 @@ if __name__ == "__main__":
     # Classification of span label strength
     # train_encodings, train_labels = preprocess_dataset_for_att_classification('data/datasets/span_annotation_train.tsv')
     val_encodings, val_labels = preprocess_dataset_for_att_classification('data/datasets/span_annotation_val.tsv')
-    # train_dataset = HateSpanClsDataset(train_encodings, train_labels)
-    val_dataset = HateSpanClsDataset(val_encodings, val_labels)
+    # train_dataset = HateSpanDataset(train_encodings, train_labels)
+    val_dataset = HateSpanDataset(val_encodings, val_labels)
 
     # train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=5)
     test_dataloader = DataLoader(val_dataset, batch_size=5)

@@ -1,10 +1,10 @@
 """HateXplain has a standard split, we want to follow it."""
 
-import json
 import csv
+import json
 import logging
-
 from typing import Dict
+
 
 def split(reference: Dict, filepath: str) -> None:
     """
