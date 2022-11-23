@@ -100,6 +100,7 @@ if __name__ == "__main__":
     # Classification of span label
     train_encodings, train_labels = preprocess_dataset_for_span_classification('data/datasets/span_annotation_train.tsv')
     train_dataset = HateSpanDataset(train_encodings, train_labels)
+    train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=64)
 
     classifier = AutoModelForSequenceClassification.from_pretrained('distilbert-base-uncased', 
                                                                 num_labels=3)
@@ -134,13 +135,8 @@ if __name__ == "__main__":
 
     # E2E classification
     train_encodings, train_labels = preprocess_dataset_for_e2e_classification('data/datasets/preprocessed_data_train.tsv')
-    val_encodings, val_labels = preprocess_dataset_for_e2e_classification('data/datasets/preprocessed_data_val.tsv')
     train_dataset = HateSpanDataset(train_encodings, train_labels)
-    val_dataset = HateSpanDataset(val_encodings, val_labels)
-
-
     train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=64)
-    test_dataloader = DataLoader(val_dataset, batch_size=64)
 
     E2Eclassifier = AutoModelForSequenceClassification.from_pretrained('distilbert-base-uncased', 
                                                                 num_labels=2)
