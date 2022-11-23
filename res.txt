@@ -1,0 +1,2 @@
+Distilbert Span Classification {'f1': 0.8052196924761601} {'accuracy': 0.8052196924761601}
+Distilbert E2E Classification {'f1': 0.7845993756503642} {'accuracy': 0.7845993756503642}

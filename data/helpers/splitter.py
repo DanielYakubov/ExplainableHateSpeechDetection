@@ -52,4 +52,4 @@ if __name__ == '__main__':
     with open("../datasets/divisions.json") as reference:
         reference = json.load(reference)
     split(reference=reference, filepath='../datasets/span_annotation.tsv')
-    split(reference=reference, filepath='../datasets/original_data.tsv')
+    split(reference=reference, filepath='../datasets/preprocessed_data.tsv')
