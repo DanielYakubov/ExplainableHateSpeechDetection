@@ -98,61 +98,38 @@ def preprocess_dataset_for_att_classification(dataset_filepath):
 
 if __name__ == "__main__":
     # Classification of span label
-    # train_encodings, train_labels = preprocess_dataset_for_span_classification('data/datasets/span_annotation_train.tsv')
-    # val_encodings, val_labels = preprocess_dataset_for_span_classification('data/datasets/span_annotation_val.tsv')
-    # train_dataset = HateSpanDataset(train_encodings, train_labels)
-    # val_dataset = HateSpanDataset(val_encodings, val_labels)
+    train_encodings, train_labels = preprocess_dataset_for_span_classification('data/datasets/span_annotation_train.tsv')
+    train_dataset = HateSpanDataset(train_encodings, train_labels)
 
-    # train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=64)
-    # test_dataloader = DataLoader(val_dataset, batch_size=64)
+    classifier = AutoModelForSequenceClassification.from_pretrained('distilbert-base-uncased', 
+                                                                num_labels=3)
 
-    # classifier = AutoModelForSequenceClassification.from_pretrained('distilbert-base-uncased', 
-    #                                                             num_labels=3)
+    optimizer = AdamW(classifier.parameters(), lr=5e-5)
 
-    # optimizer = AdamW(classifier.parameters(), lr=5e-5)
+    num_epochs = 3
+    num_training_steps = num_epochs * len(train_dataloader)
+    lr_scheduler = get_scheduler(
+        name="linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=num_training_steps
+    )
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    classifier.to(device)
 
-    # num_epochs = 3
-    # num_training_steps = num_epochs * len(train_dataloader)
-    # lr_scheduler = get_scheduler(
-    #     name="linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=num_training_steps
-    # )
-    # device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    # classifier.to(device)
+    # # training loop
+    progress_bar = tqdm(range(num_training_steps))
+    classifier.train()
+    for epoch in range(num_epochs):
+        for batch in train_dataloader:
+            batch = {k: v.to(device) for k, v in batch.items()}
+            outputs = classifier(**batch)
+            loss = outputs.loss
+            loss.backward()
 
-    # # # training loop
-    # progress_bar = tqdm(range(num_training_steps))
-    # classifier.train()
-    # for epoch in range(num_epochs):
-    #     for batch in train_dataloader:
-    #         batch = {k: v.to(device) for k, v in batch.items()}
-    #         outputs = classifier(**batch)
-    #         loss = outputs.loss
-    #         loss.backward()
-
-    #         optimizer.step()
-    #         lr_scheduler.step()
-    #         optimizer.zero_grad()
-    #         progress_bar.update(1)
-    #     # saving the model per epoch
-    #     torch.save(classifier, 'models/span_classifier_model.pth')
-    
-    # # evaluate
-    # classifier = torch.load('models/span_classifier_model.pth')
-    # metric1 = evaluate.load("f1")
-    # metric2 = evaluate.load("accuracy")
-    # classifier.eval()
-    # for batch in test_dataloader:
-    #     batch = {k: v.to(device) for k, v in batch.items()}
-    #     with torch.no_grad():
-    #         outputs = classifier(**batch)
-    #     logits = outputs.logits
-    #     predictions = torch.argmax(logits, dim=-1)
-    #     metric1.add_batch(predictions=predictions, references=batch["labels"])
-    #     metric2.add_batch(predictions=predictions, references=batch["labels"])
-    # res1 = metric1.compute(average='micro')
-    # res2 = metric2.compute()
-    # with open('res.txt', 'w') as f:
-    #     print('Distilbert Span Classification', res1, res2, file=f)
+            optimizer.step()
+            lr_scheduler.step()
+            optimizer.zero_grad()
+            progress_bar.update(1)
+        # saving the model per epoch
+        torch.save(classifier, 'models/span_classifier_model.pth')
 
 
     # E2E classification
@@ -194,77 +171,3 @@ if __name__ == "__main__":
             progress_bar.update(1)
         # saving the model per epoch
         torch.save(E2Eclassifier, 'models/e2e_classifier_model.pth')
-    
-    # evaluate
-    metric1 = evaluate.load("f1")
-    metric2 = evaluate.load("accuracy")
-    E2Eclassifier.eval()
-    for batch in test_dataloader:
-        batch = {k: v.to(device) for k, v in batch.items()}
-        with torch.no_grad():
-            outputs = E2Eclassifier(**batch)
-        logits = outputs.logits
-        predictions = torch.argmax(logits, dim=-1)
-        metric1.add_batch(predictions=predictions, references=batch["labels"])
-        metric2.add_batch(predictions=predictions, references=batch["labels"])
-    res1 = metric1.compute(average='micro')
-    res2 = metric2.compute()
-    with open('res.txt', 'a') as f:
-        print('Distilbert E2E Classification', res1, res2, file=f)
-
-
-
-    # Classification of span label strength
-    # train_encodings, train_labels = preprocess_dataset_for_att_classification('data/datasets/span_annotation_train.tsv')
-    # val_encodings, val_labels = preprocess_dataset_for_att_classification('data/datasets/span_annotation_val.tsv')
-    # train_dataset = HateSpanDataset(train_encodings, train_labels)
-    # val_dataset = HateSpanDataset(val_encodings, val_labels)
-
-    # train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=32)
-    # test_dataloader = DataLoader(val_dataset, batch_size=32)
-
-    # classifier = AutoModelForSequenceClassification.from_pretrained('distilbert-base-uncased', 
-    #                                                             num_labels=6)
-
-    # optimizer = AdamW(classifier.parameters(), lr=5e-5)
-
-    # num_epochs = 3
-    # num_training_steps = num_epochs * len(train_dataloader)
-    # lr_scheduler = get_scheduler(
-    #     name="linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=num_training_steps
-    # )
-    # device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    # classifier.to(device)
-
-    # # training loop
-    # progress_bar = tqdm(range(num_training_steps))
-    # classifier.train()
-    # for epoch in range(num_epochs):
-    #     for batch in train_dataloader:
-    #         batch = {k: v.to(device) for k, v in batch.items()}
-    #         outputs = classifier(**batch)
-    #         loss = outputs.loss
-    #         loss.backward()
-
-    #         optimizer.step()
-    #         lr_scheduler.step()
-    #         optimizer.zero_grad()
-    #         progress_bar.update(1)
-    #     # saving the model per epoch
-    #     torch.save(classifier, 'models/span_intensity_cls_model.pth')
-    # classifier = torch.load('models/span_intensity_cls_model.pth')
-    # classifier.eval()
-    
-    # # evaluate
-    # metric = evaluate.load("f1")
-    # classifier.eval()
-    # for batch in test_dataloader:
-    #     batch = {k: v.to(device) for k, v in batch.items()}
-    #     with torch.no_grad():
-    #         outputs = classifier(**batch)
-    #     logits = outputs.logits
-    #     predictions = torch.argmax(logits, dim=-1)
-    #     metric.add_batch(predictions=predictions, references=batch["labels"])
-    # res = metric.compute(average='micro')
-    # with open('res.txt', 'a') as f:
-    #     print('Distilbert Span intensity Classification', res, file=f)
