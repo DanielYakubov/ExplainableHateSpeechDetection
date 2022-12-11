@@ -57,59 +57,60 @@ def tree_based_classification(tree: nltk.tree, classifier):
                 label = 1 # single token cannot be 'mixed', defaulting to non-toxic
             yield span, label
 
+
 if __name__ == '__main__':
-    # # first, evaling BERT models
-    # device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    # first, evaling BERT models
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-    # test_encodings, test_labels = preprocess_dataset_for_span_classification('data/datasets/span_annotation_test.tsv')
-    # test_dataset = HateSpanDataset(test_encodings, test_labels)
-    # test_dataloader = DataLoader(test_dataset, batch_size=64)
+    test_encodings, test_labels = preprocess_dataset_for_span_classification('data/datasets/span_annotation_test.tsv')
+    test_dataset = HateSpanDataset(test_encodings, test_labels)
+    test_dataloader = DataLoader(test_dataset, batch_size=64)
 
-    # # evaluate span classifier
-    # classifier = torch.load('models/span_classifier_model.pth')
-    # metric1 = evaluate.load("f1")
-    # metric2 = evaluate.load("accuracy")
-    # classifier.eval()
+    # evaluate span classifier
+    classifier = torch.load('models/span_classifier_model.pth')
+    metric1 = evaluate.load("f1")
+    metric2 = evaluate.load("accuracy")
+    classifier.eval()
 
-    # span_progress_bar = tqdm(range(len(test_dataloader)))
-    # for batch in test_dataloader:
-    #     batch = {k: v.to(device) for k, v in batch.items()}
-    #     with torch.no_grad():
-    #         outputs = classifier(**batch)
-    #     logits = outputs.logits
-    #     predictions = torch.argmax(logits, dim=-1)
-    #     metric1.add_batch(predictions=predictions, references=batch["labels"])
-    #     metric2.add_batch(predictions=predictions, references=batch["labels"])
-    #     span_progress_bar.update(1)
-    # res1 = metric1.compute(average='macro')
-    # res2 = metric2.compute()
-    # with open('res.txt', 'w') as f:
-    #     print('Distilbert Span Classification', res1, res2, file=f)
+    span_progress_bar = tqdm(range(len(test_dataloader)))
+    for batch in test_dataloader:
+        batch = {k: v.to(device) for k, v in batch.items()}
+        with torch.no_grad():
+            outputs = classifier(**batch)
+        logits = outputs.logits
+        predictions = torch.argmax(logits, dim=-1)
+        metric1.add_batch(predictions=predictions, references=batch["labels"])
+        metric2.add_batch(predictions=predictions, references=batch["labels"])
+        span_progress_bar.update(1)
+    res1 = metric1.compute(average='macro')
+    res2 = metric2.compute()
+    with open('results/res.txt', 'w') as f:
+        print('Distilbert Span Classification', res1, res2, file=f)
 
-    # # evaluate E2E model
-    # test_encodings, test_labels = preprocess_dataset_for_e2e_classification('data/datasets/preprocessed_data_test.tsv')
-    # test_dataset = HateSpanDataset(test_encodings, test_labels)
-    # test_dataloader = DataLoader(test_dataset, batch_size=64)
+    # evaluate E2E model
+    test_encodings, test_labels = preprocess_dataset_for_e2e_classification('data/datasets/preprocessed_data_test.tsv')
+    test_dataset = HateSpanDataset(test_encodings, test_labels)
+    test_dataloader = DataLoader(test_dataset, batch_size=64)
 
-    # E2Eclassifier = torch.load('models/e2e_classifier_model.pth')
-    # metric1 = evaluate.load("f1")
-    # metric2 = evaluate.load("accuracy")
-    # E2Eclassifier.eval()
+    E2Eclassifier = torch.load('models/e2e_classifier_model.pth')
+    metric1 = evaluate.load("f1")
+    metric2 = evaluate.load("accuracy")
+    E2Eclassifier.eval()
 
-    # e2e_progress_bar = tqdm(range(len(test_dataloader)))
-    # for batch in test_dataloader:
-    #     batch = {k: v.to(device) for k, v in batch.items()}
-    #     with torch.no_grad():
-    #         outputs = E2Eclassifier(**batch)
-    #     logits = outputs.logits
-    #     predictions = torch.argmax(logits, dim=-1)
-    #     metric1.add_batch(predictions=predictions, references=batch["labels"])
-    #     metric2.add_batch(predictions=predictions, references=batch["labels"])
-    #     e2e_progress_bar.update(1)
-    # res1 = metric1.compute(average='macro')
-    # res2 = metric2.compute()
-    # with open('res.txt', 'a') as f:
-    #     print('Distilbert E2E Classification', res1, res2, file=f)
+    e2e_progress_bar = tqdm(range(len(test_dataloader)))
+    for batch in test_dataloader:
+        batch = {k: v.to(device) for k, v in batch.items()}
+        with torch.no_grad():
+            outputs = E2Eclassifier(**batch)
+        logits = outputs.logits
+        predictions = torch.argmax(logits, dim=-1)
+        metric1.add_batch(predictions=predictions, references=batch["labels"])
+        metric2.add_batch(predictions=predictions, references=batch["labels"])
+        e2e_progress_bar.update(1)
+    res1 = metric1.compute(average='macro')
+    res2 = metric2.compute()
+    with open('results/res.txt', 'a') as f:
+        print('Distilbert E2E Classification', res1, res2, file=f)
 
 
     # baseline
@@ -130,7 +131,7 @@ if __name__ == '__main__':
     dummy_y = dummy_classifier.predict(posts)
 
     progress_bar = tqdm(range(len(posts)))
-    with open('pred_rationals.tsv', 'w') as f:
+    with open('results/pred_rationals.tsv', 'w') as f:
         tsv_writer = csv.writer(f, delimiter='\t')
         tsv_writer.writerow(['post_id', 'post_toks', 'rationales', 'label'])
         for id, post in zip(data["post_id"], posts):
@@ -153,7 +154,7 @@ if __name__ == '__main__':
     f1_score_dummy = f1_score(true_y, dummy_y, average='macro')
     accuracy_score_dummy = accuracy_score(true_y, dummy_y)
 
-    with open('res.txt', 'a') as res:
+    with open('results/res.txt', 'a') as res:
         print(f'Dummy Classifier f1: {f1_score_dummy} accuracy: {accuracy_score_dummy}', file=res)
         print(f'Tree Classifier f1: {f1_score_tree} accuracy: {accuracy_score_tree}', file=res)
 
