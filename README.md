@@ -1,6 +1,6 @@
 # ExplainableHateSpeechDetection
 
-### REWORK PLANNED FOR MARCH 2025
+### REWORK PLANNED FOR MAY 2025
 
 This repo hosts code for the Constituent Rationale Explainability Framework (C-REF). This Framework was developed in order to attempt to solve the issue of hate speech classification systems not providing human rationales for their responses. More details on the motivation can be seen in the PDF paper also hosted in this repo. 
 
