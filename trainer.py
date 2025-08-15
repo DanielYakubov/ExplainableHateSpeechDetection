@@ -1,7 +1,7 @@
+import ast
 import logging
 from typing import List, Tuple
 
-import ast
 import evaluate
 import numpy as np
 import pandas as pd
@@ -18,17 +18,20 @@ from data.helpers.make_dataset import HateSpanDataset
 
 logging.basicConfig(level=logging.INFO)
 
-TOKENIZER = AutoTokenizer.from_pretrained('distilbert-base-uncased')
-MODEL = BertModel.from_pretrained('bert-base-uncased',
-                                 output_hidden_states=True)
+TOKENIZER = AutoTokenizer.from_pretrained("distilbert-base-uncased")
+MODEL = BertModel.from_pretrained("bert-base-uncased",
+                                  output_hidden_states=True)
 
 
 def get_embeddings(span: str) -> object:
-    """
-    Calculates the embedding for a span. The embedding is calculated by taking the average of
+    """Calculates the embedding for a span. The embedding is calculated by taking the average of
     the second to last layer of a BERT model for each token in the span
-    :param span: str span
-    :return: an embedding for the span
+
+    Args:
+        span: A str representation of the span
+
+    Returns:
+        An embedding for the span
     """
     span = "[CLS]" + span + "[SEP]"
     tokenized_span = list(TOKENIZER(span))
@@ -37,7 +40,7 @@ def get_embeddings(span: str) -> object:
     tok_tensor = torch.tensor([indexed_tokens])
     seg_tensor = torch.tensor([segment_ids])
     with torch.no_grad():
-        outputs = MODEL(tok_tensor, seg_tensor)    
+        outputs = MODEL(tok_tensor, seg_tensor)
         hidden_states = outputs[2]
     token_vecs = hidden_states[-2][0]
     # calculate average of second to last
@@ -45,14 +48,19 @@ def get_embeddings(span: str) -> object:
     return sentence_embedding
 
 
-def preprocess_dataset_for_span_classification(dataset_filepath: str) -> Tuple[List[object], List[int]]:
-    """
-    preprocesses the span dataset. Spans that have a_s > 0 and have a post level label in
-    ["hatespeech", "offensive"] are kept as is, a_s < -1 means the span is mixed, 
+def preprocess_dataset_for_span_classification(
+    dataset_filepath: str,) -> Tuple[List[object], List[int]]:
+    """Preprocesses the span dataset. Spans that have a_s > 0 and have a post level label in
+    ["hatespeech", "offensive"] are kept as is, a_s < -1 means the span is mixed,
     everything else is converted to normal labels.
-    :param dataset_filepath: a file path to a dataset containing spans, the columns must include
-    ["span", "post_hs_label", "span_label"]
-    :return: a tuple containing a list of embeddings and a list of labels for the output
+
+    Args:
+        dataset_filepath: a file path to a dataset containing spans, the columns must include
+        ["span", "post_hs_label", "span_label"]
+
+    Returns:
+        encodings: A container of embeddings
+        out_labels: The list of classification labels as ints
     """
     l2n = {
         "mixed": 0,
@@ -60,59 +68,89 @@ def preprocess_dataset_for_span_classification(dataset_filepath: str) -> Tuple[L
         "toxic": 2,
     }
 
-    data = pd.read_csv(dataset_filepath, delimiter='\t')
+    data = pd.read_csv(dataset_filepath, delimiter="\t")
     texts = data["span"].to_list()
     labels = data["post_hs_label"]
     out_labels = [l2n[l] for l in labels]
-    encodings = TOKENIZER(texts, truncation=True, padding='max_length', max_length=128)
+    encodings = TOKENIZER(texts,
+                          truncation=True,
+                          padding="max_length",
+                          max_length=128)
     return encodings, out_labels
 
 
-def preprocess_dataset_for_e2e_classification(dataset_filepath):
-    data = pd.read_csv(dataset_filepath, delimiter='\t')
-    texts = [' '.join(ast.literal_eval(pt)) for pt in data["post_tokens"]]
-    labels = [0 if d == 'non-toxic' else 1 for d in data["hs_label"]]
-    encodings = TOKENIZER(texts, truncation=True, padding='max_length', max_length=128)
+def preprocess_dataset_for_e2e_classification(
+        dataset_filepath: str) -> Tuple[List[object], List[int]]:
+    """Preprocesses the dataset for end-to-end classification.
+
+    Args:
+         dataset_filepath: a file path to a dataset containing hate speech
+    Returns:
+        encodings: A container of embeddings
+        out_labels: The list of classification labels as ints
+    """
+    data = pd.read_csv(dataset_filepath, delimiter="\t")
+    texts = [" ".join(ast.literal_eval(pt)) for pt in data["post_tokens"]]
+    labels = [0 if d == "non-toxic" else 1 for d in data["hs_label"]]
+    encodings = TOKENIZER(texts,
+                          truncation=True,
+                          padding="max_length",
+                          max_length=128)
     return encodings, labels
 
-def preprocess_dataset_for_att_classification(dataset_filepath):
+
+def preprocess_dataset_for_att_classification(
+        dataset_filepath) -> Tuple[List[object], List[int]]:
+    """Preprocesses the span dataset for agreeableness classification
+
+    Args:
+        dataset_filepath: a file path to a dataset containing spans, the columns must include
+        ["span", "span_label"]
+
+    Returns:
+        encodings: A container of embeddings
+        out_labels: The list of classification labels as ints
     """
-    preprocesses the span dataset for agreeableness classification
-    :param dataset_filepath: a file path to a dataset containing spans, the columns must include
-    ["span", "span_label"]
-    :return: a tuple containing a list of embeddings and a list of labels for the output
-    """
-    data = pd.read_csv(dataset_filepath, delimiter='\t')
+    data = pd.read_csv(dataset_filepath, delimiter="\t")
     texts = data["span"]
     labels = data["span_label"]
 
     processed_texts = []
     out_labels = []
     for t, l in zip(texts, labels):
-        if l > 0: # at inference, we will only be classifying texts that are already hatespeech or offensive speech
+        if (
+                l > 0
+        ):  # at inference, we will only be classifying texts that are already hatespeech or offensive speech
             processed_texts.append(t)
             out_labels.append(l)
-    encodings = TOKENIZER(processed_texts, truncation=True, padding=True, max_length=30) # don't expect any spans to be very long
+    encodings = TOKENIZER(
+        processed_texts, truncation=True, padding=True,
+        max_length=30)  # don't expect any spans to be very long
     return encodings, out_labels
 
 
 if __name__ == "__main__":
     # Classification of span label
-    train_encodings, train_labels = preprocess_dataset_for_span_classification('data/datasets/span_annotation_train.tsv')
+    train_encodings, train_labels = preprocess_dataset_for_span_classification(
+        "data/datasets/span_annotation_train.tsv")
     train_dataset = HateSpanDataset(train_encodings, train_labels)
     train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=64)
 
-    classifier = AutoModelForSequenceClassification.from_pretrained('distilbert-base-uncased', 
-                                                                num_labels=3)
+    classifier = AutoModelForSequenceClassification.from_pretrained(
+        "distilbert-base-uncased", num_labels=3)
 
     optimizer = AdamW(classifier.parameters(), lr=5e-5)
 
     num_epochs = 3
     num_training_steps = num_epochs * len(train_dataloader)
     lr_scheduler = get_scheduler(
-        name="linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=num_training_steps
+        name="linear",
+        optimizer=optimizer,
+        num_warmup_steps=0,
+        num_training_steps=num_training_steps,
     )
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    device = (torch.device("cuda")
+              if torch.cuda.is_available() else torch.device("cpu"))
     classifier.to(device)
 
     # # training loop
@@ -130,25 +168,29 @@ if __name__ == "__main__":
             optimizer.zero_grad()
             progress_bar.update(1)
         # saving the model per epoch
-        torch.save(classifier, 'models/span_classifier_model.pth')
-
+        torch.save(classifier, "models/span_classifier_model.pth")
 
     # E2E classification
-    train_encodings, train_labels = preprocess_dataset_for_e2e_classification('data/datasets/preprocessed_data_train.tsv')
+    train_encodings, train_labels = preprocess_dataset_for_e2e_classification(
+        "data/datasets/preprocessed_data_train.tsv")
     train_dataset = HateSpanDataset(train_encodings, train_labels)
     train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=64)
 
-    E2Eclassifier = AutoModelForSequenceClassification.from_pretrained('distilbert-base-uncased', 
-                                                                num_labels=2)
+    E2Eclassifier = AutoModelForSequenceClassification.from_pretrained(
+        "distilbert-base-uncased", num_labels=2)
 
     optimizer = AdamW(E2Eclassifier.parameters(), lr=5e-5)
 
     num_epochs = 3
     num_training_steps = num_epochs * len(train_dataloader)
     lr_scheduler = get_scheduler(
-        name="linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=num_training_steps
+        name="linear",
+        optimizer=optimizer,
+        num_warmup_steps=0,
+        num_training_steps=num_training_steps,
     )
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    device = (torch.device("cuda")
+              if torch.cuda.is_available() else torch.device("cpu"))
     E2Eclassifier.to(device)
 
     # training loop
@@ -166,4 +208,4 @@ if __name__ == "__main__":
             optimizer.zero_grad()
             progress_bar.update(1)
         # saving the model per epoch
-        torch.save(E2Eclassifier, 'models/e2e_classifier_model.pth')
+        torch.save(E2Eclassifier, "models/e2e_classifier_model.pth")
