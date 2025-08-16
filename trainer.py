@@ -140,7 +140,7 @@ def fine_tune(train_encodings: BatchEncoding,
     for epoch in tqdm(range(num_epochs)):
         for batch in train_dataloader:
             batch = to_device(batch, device)
-                outputs = classifier(**batch)
+            outputs = classifier(**batch)
             loss = outputs.loss
             loss.backward()
             optimizer.step()
